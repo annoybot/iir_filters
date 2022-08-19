@@ -13,7 +13,6 @@ edition = "2021"
 name = "iir_filters"
 
 [dependencies]
-#num-complex = { git = "https://github.com/annoybot/num-complex.git", branch="master" }
 num-complex = "^0.4.2"
 num-traits = "^0.2.15"
 ndarray = "^0.15.6"

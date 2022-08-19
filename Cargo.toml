@@ -1,0 +1,25 @@
+[package]
+name = "iir_filters"
+version = "0.1.0"
+authors = ["https://github.com/annoybot"]
+description = "A Rust re-implementation of some of scipy's digital filters."
+keywords = ["biquad", "filter", "iir"]
+readme = "README.md"
+license = "Apache-2.0"
+repository = "https://github.com/annoybot/iir_filters"
+edition = "2021"
+
+[lib]
+name = "iir_filters"
+
+[dependencies]
+#num-complex = { git = "https://github.com/annoybot/num-complex.git", branch="master" }
+num-complex = "^0.4.2"
+num-traits = "^0.2.15"
+ndarray = "^0.15.6"
+thiserror = "^1.0.32"
+more-asserts = "^0.3.0"
+
+[dev-dependencies]
+rstest = "^0.13.0"
+stdext = "^0.3.1"

@@ -20,10 +20,10 @@
 //!
 //!     let mut dft2 = DirectForm2Transposed::new(&sos);
 //!
-//!     let data:Vec<f64>  = vec![1.0, 2.0, 3.0];
+//!     let input:Vec<f64>  = vec![1.0, 2.0, 3.0];
 //!     let mut output:Vec<f64> = vec![];
 //!
-//!     for x in data.iter() {
+//!     for x in input.iter() {
 //!         output.push( dft2.filter(*x) );
 //!     }
 //!

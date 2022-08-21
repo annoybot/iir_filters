@@ -4,7 +4,7 @@
 
 use std::f64::consts::PI;
 use std::ops::Range;
-use ndarray::{arr1, Array, Axis};
+//use ndarray::{arr1, Array, Axis};
 use num_complex::{Complex, Complex64};
 use num_traits::{One, Pow, Zero};
 use crate::errors::Error;
@@ -300,23 +300,42 @@ fn lp2hp_zpk(zpk: &ZPKCoeffs, wo:f64) -> Result<ZPKCoeffs, Error>
 
 fn bilinear_zpk(zpk: &ZPKCoeffs, fs:f64) -> Result<ZPKCoeffs, Error>
 {
+    let one = Complex::<f64>::one();
+
     let degree = relative_degree(zpk)?;
 
-    let z = arr1(&zpk.z);
-    let p = arr1(&zpk.p);
+    let z = zpk.z.clone();
+    let p = zpk.p.clone();
 
     let fs2 = Complex::<f64>::new(2.0 * fs, 0.0);
 
     // Bilinear transform the poles and zeros
-    let mut z_z = (fs2 + &z) / (fs2 - &z);
-    let p_z = (fs2 + &p) / (fs2 - &p);
+    
+    // ndarray version: let mut z_z = (fs2 + &z) / (fs2 - &z);
+    let mut z_z: Vec<Complex<f64>> = z.iter()
+        .map(|z| (fs2 + z) / (fs2 - z))
+        .collect();
+
+    // ndarray version: let p_z = (fs2 + &p) / (fs2 - &p);
+    let p_z:Vec<Complex<f64>> = p.iter()
+        .map(|p| (fs2 + p) / (fs2 - p))
+        .collect();
 
     // Any zeros that were at infinity get moved to the Nyquist frequency
-    z_z.append( Axis(0), (- Array::ones(degree)).view() )?;
-
+    // ndarray version: z_z.append( Axis(0), (- Array::ones(degree)).view() )?;
+    z_z.append(&mut vec![-one; degree]);
 
     // Compensate for gain change
-    let k_z = zpk.k * ( (fs2 - z).product() / (fs2 - p).product() ).re;
+    
+    // ndarray version: let k_z = zpk.k * ( (fs2 - z).product() / (fs2 - p).product() ).re;
+    let k_z = zpk.k * (
+        z.iter()
+            .map(|z| fs2 - z)
+            .fold(one, |acc, x| acc * x) /
+            p.iter()
+                .map(|p| fs2 - p)
+                .fold(one, |acc, x| acc * x))
+        .re;
 
     Ok( ZPKCoeffs {z: z_z.to_vec(), p: p_z.to_vec(), k: k_z} )
 }

@@ -4,7 +4,6 @@
 
 use std::f64::consts::PI;
 use std::ops::Range;
-//use ndarray::{arr1, Array, Axis};
 use num_complex::{Complex, Complex64};
 use num_traits::{One, Pow, Zero};
 use crate::errors::Error;

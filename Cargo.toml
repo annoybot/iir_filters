@@ -15,7 +15,6 @@ name = "iir_filters"
 [dependencies]
 num-complex = "^0.4.2"
 num-traits = "^0.2.15"
-ndarray = "^0.15.6"
 thiserror = "^1.0.32"
 
 [dev-dependencies]

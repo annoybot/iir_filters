@@ -1,6 +1,6 @@
 [package]
 name = "iir_filters"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["https://github.com/annoybot"]
 description = "A Rust re-implementation of some of scipy's digital filters."
 keywords = ["biquad", "filter", "iir"]

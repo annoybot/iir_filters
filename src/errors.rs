@@ -1,7 +1,6 @@
 //! Errors which originate in this library.
-use crate::errors::Error::{IllegalArgument, InternalError};
+use crate::errors::Error::IllegalArgument;
 use std::num::ParseFloatError;
-use ndarray::ShapeError;
 use thiserror::Error as ThisError;
 
 #[derive(ThisError, Debug, PartialEq)]
@@ -22,8 +21,3 @@ impl From<ParseFloatError> for Error {
     }
 }
 
-impl From<ShapeError> for Error {
-    fn from(err: ShapeError) -> Self {
-        InternalError(err.to_string())
-    }
-}

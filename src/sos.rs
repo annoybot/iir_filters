@@ -1,7 +1,6 @@
 //! Second order sections.
 use std::cmp::max;
 use std::collections::{HashMap};
-use ndarray::{arr1, Array, Array2, Axis, s};
 use num_complex::{Complex};
 use num_traits::{Zero};
 
@@ -122,8 +121,8 @@ pub fn zpk2sos(zpk: &ZPKCoeffs, pairing: Option<SosPairing>) -> Result<Sos, Erro
         Some(value) => { value }
     };
 
-    let mut z = arr1(&zpk.z);
-    let mut p = arr1(&zpk.p);
+    let mut z = zpk.z.clone();
+    let mut p = zpk.p.clone();
 
     if z.is_empty() && p.is_empty() {
         return Ok( Sos::from_vec(vec![[zpk.k, 0.0, 0.0, 1.0, 0.0, 0.0]]) );
@@ -140,16 +139,15 @@ pub fn zpk2sos(zpk: &ZPKCoeffs, pairing: Option<SosPairing>) -> Result<Sos, Erro
             n_sections = (p.len() + 1) / 2;
         }
         _ => {
-
-            // Ensure we have the same number of poles and zeros, and make copies
-            p.append( Axis(0), (Array::zeros(max(z.len() as i32 - p.len() as i32, 0) as usize )).view() )?;
-            z.append( Axis(0), (Array::zeros(max(p.len() as i32 - z.len() as i32, 0) as usize )).view() )?;
+            // Ensure we have the same number of poles and zeros, and make copies.
+            p.append( &mut vec![Complex::<f64>::zero(); max(z.len() as i32 - p.len() as i32, 0) as usize]);
+            z.append( &mut vec![Complex::<f64>::zero(); max(p.len() as i32 - z.len() as i32, 0) as usize]);
 
             n_sections = (max(p.len(), z.len()) + 1) / 2;
 
             if p.len() % 2 == 1 && pairing == Nearest {
-                p.append(Axis(0), (Array::zeros(1)).view())?;
-                z.append(Axis(0), (Array::zeros(1)).view())?;
+                p.push(Complex::<f64>::zero());
+                z.push(Complex::<f64>::zero());
             }
 
             assert_eq!(p.len(), z.len());
@@ -180,7 +178,7 @@ pub fn zpk2sos(zpk: &ZPKCoeffs, pairing: Option<SosPairing>) -> Result<Sos, Erro
     let mut z: HashMap<usize, Complex<f64>> = z.iter().enumerate().map(|(i,c)| (i, *c)).collect::<HashMap<_, _>>();
 
     //Construct the system, reversing order so the "worst" are last
-    let mut sos = Array2::<Complex<f64>>::zeros((n_sections, 6));
+    let mut sos = vec![vec![Complex::<f64>::zero(); 6]; n_sections];
 
     for si in (0..=n_sections-1).rev() {
         //Select the next "worst" pole, p1.
@@ -198,19 +196,19 @@ pub fn zpk2sos(zpk: &ZPKCoeffs, pairing: Option<SosPairing>) -> Result<Sos, Erro
 
                // sos[si] = _single_zpksos([z1, 0], [p1, 0], 1)
                 for (i, e) in single_zpksos(&[z1, Complex::<f64>::zero()], &[p1, Complex::<f64>::zero()], 1.0)?.iter().enumerate() {
-                    sos[[si, i]] = *e;
+                    sos[si][i] = *e;
                 }
             } else if !z.is_empty() {
                 let z1 = find_and_remove_closest(&mut z, NumberType::Real, &p1)?;
 
                 // sos[si] = _single_zpksos([z1], [p1], 1)
                 for (i, e) in single_zpksos(&[z1], &[p1], 1.0)?.iter().enumerate() {
-                    sos[[si, i]] = *e;
+                    sos[si][i] = *e;
                 }
             } else {
                 // sos[si] = _single_zpksos([], [p1], 1)
                 for (i, e) in single_zpksos(&[], &[p1], 1.0)?.iter().enumerate() {
-                    sos[[si, i]] = *e;
+                    sos[si][i] = *e;
                 }
             }
         }
@@ -226,7 +224,7 @@ pub fn zpk2sos(zpk: &ZPKCoeffs, pairing: Option<SosPairing>) -> Result<Sos, Erro
 
             //sos[si] = _single_zpksos([z1, z1.conj()], [p1, p1.conj()], 1)
             for (i, e) in single_zpksos(&[z1, z1.conj()], &[p1, p1.conj()], 1.0)?.iter().enumerate() {
-                sos[[si, i]] = *e;
+                sos[si][i] = *e;
             }
         }
         else {
@@ -247,26 +245,26 @@ pub fn zpk2sos(zpk: &ZPKCoeffs, pairing: Option<SosPairing>) -> Result<Sos, Erro
                 if !is_real(z1) {
                     //sos[si] = _single_zpksos([z1, z1.conj()], [p1, p2], 1)
                     for (i, e) in single_zpksos(&[z1, z1.conj()], &[p1, p2], 1.0)?.iter().enumerate() {
-                        sos[[si, i]] = *e;
+                        sos[si][i] = *e;
                     }
                 } else if !z.is_empty() {
                     let z2 = find_and_remove_closest(&mut z, NumberType::Real, &p1)?;
 
                     //sos[si] = _single_zpksos([z1, z2], [p1, p2], 1)
                     for (i, e) in single_zpksos(&[z1, z2], &[p1, p2], 1.0)?.iter().enumerate() {
-                        sos[[si, i]] = *e;
+                        sos[si][i] = *e;
                     }
                 } else {
                     //sos[si] = _single_zpksos([z1], [p1, p2], 1)
                     for (i, e) in single_zpksos(&[z1], &[p1, p2], 1.0)?.iter().enumerate() {
-                        sos[[si, i]] = *e;
+                        sos[si][i] = *e;
                     }
                 }
 
             } else {
                 // No more zeros.
                 for (i, e) in single_zpksos(&[], &[p1, p2], 1.0)?.iter().enumerate() {
-                    sos[[si, i]] = *e;
+                    sos[si][i] = *e;
                 }
             }
         }
@@ -276,18 +274,13 @@ pub fn zpk2sos(zpk: &ZPKCoeffs, pairing: Option<SosPairing>) -> Result<Sos, Erro
     assert!(p.is_empty(), "zpk2sos failed to consume all the poles.");
 
     // Put gain in first section.
-    for e in sos.slice_mut(s![0, ..3]).iter_mut() {
+    for e in sos[0][..3].iter_mut() {
         *e *= zpk.k;
     }
 
     let mut results:Sos = Sos::new();
 
-    /*
-    println!("sos.shape: {:?}", sos.shape());
-    println!("sos: {:?}", sos);
-    */
-
-    for row in sos.axis_iter(Axis(0)) {
+    for row in sos.iter() {
         let mut row_array:[f64;6] = [0.0;6];
 
         for (i,e) in row.iter().enumerate() {

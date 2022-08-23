@@ -65,6 +65,10 @@ pub struct ZPKCoeffs {
 ///  }
 /// ```
 pub fn butter(N: u32, filter_type: FilterType, fs: f64) -> Result<ZPKCoeffs, Error> {
+    iirfilter(N, filter_type, Some( fs ) )
+}
+
+fn butter_internal(N: u32, filter_type: FilterType, fs: Option<f64>) -> Result<ZPKCoeffs, Error> {
     iirfilter(N, filter_type, fs )
 }
 
@@ -81,7 +85,7 @@ pub fn butter(N: u32, filter_type: FilterType, fs: f64) -> Result<ZPKCoeffs, Err
 ///
 /// The requested filter in (Zero Pole Gain)[ZPKCoeffs] format.
 ///
-fn iirfilter(N: u32, filter_type:FilterType, fs: f64) -> Result<ZPKCoeffs, Error> {
+fn iirfilter(N: u32, filter_type:FilterType, fs: Option<f64>) -> Result<ZPKCoeffs, Error> {
     // Convert enum based frequency parameters to python style Wn array for internal use.
     let mut Wn:Vec<f64> = match filter_type {
         FilterType::LowPass(cutoff) | FilterType::HighPass(cutoff) => { vec![cutoff] }
@@ -94,13 +98,22 @@ fn iirfilter(N: u32, filter_type:FilterType, fs: f64) -> Result<ZPKCoeffs, Error
             return Err(IllegalArgument("Frequencies Wn must not be zero.".to_string()))
         }
 
-        *Wn = 2.0 * *Wn / fs
+        if let Some(fs) = fs {
+            *Wn = 2.0 * *Wn / fs
+        }
     }
 
     // Validate the scaled frequencies.
     for Wn in &Wn {
         if *Wn <= 0.0 || *Wn >= 1.0 {
-            return Err( IllegalArgument(format!("Digital filter critical frequencies must be 0 < Wn < fs/2 (fs={} -> fs/2={})", fs, fs/2.0)) );
+            match fs {
+                Some(fs) => {
+                    return Err( IllegalArgument(format!("Digital filter critical frequencies must be 0 < Wn < fs/2 (fs={} -> fs/2={})", fs, fs/2.0)) );
+                }
+                None => {
+                    return Err( IllegalArgument("Digital filter critical frequencies must be 0 < Wn < 1".to_string()) );
+                }
+            }
         }
     }
 
@@ -142,7 +155,7 @@ fn iirfilter(N: u32, filter_type:FilterType, fs: f64) -> Result<ZPKCoeffs, Error
     Ok( zpk )
 }
 
-/// Return (z,p,k) for analog prototype of Nth-order Butterworth filter.
+/// Return [ZPKCoeffs] for analog prototype of Nth-order Butterworth filter.
 /// The filter will have an angular (e.g., rad/s) cutoff frequency of 1.
 fn butterap(N:u32) -> Result<ZPKCoeffs, Error> {
     let N2:i32 = N as i32;
@@ -380,6 +393,9 @@ mod tests {
     use num_traits::identities::Zero;
     use num_complex::Complex;
     use crate::filter_design::butterap;
+    use crate::filter_design::FilterType::{BandStop, HighPass};
+    use num_complex::ComplexFloat;
+    use crate::util::Keys;
 
     #[test]
     fn test_butterap() {
@@ -397,6 +413,184 @@ mod tests {
         let zpk_out = butterap(5).expect("butterap failed.");
 
         zpk_out.assert_approx_equal_to(&zpk_expected, 1E-12);
+    }
+
+    #[test]
+    fn test_butter__basic_digital_z_plane() {
+        for N in 0..25 {
+            let zpk = butter_internal(N, HighPass(0.01),  None).expect("Call to butter failed");
+
+            assert_eq!(zpk.z.len(), N as usize);
+
+            // All zeros exactly at DC
+            for e in zpk.z.iter() {
+                assert_eq!(*e, Complex::<f64>::one());
+            }
+
+            // No poles outside unit circle
+            for e in zpk.p.iter() {
+                assert!( e.abs() <= 1.0 );
+            }
+        }
+    }
+
+    #[test]
+    fn test_butter_highpass_high_even_order() {
+        let zpk_out = butter_internal(28, HighPass(0.43), None).expect("Call to butter failed");
+
+        let zpk_expected = ZPKCoeffs {
+            z: vec![Complex::<f64>::one(); 28],
+            p: vec_cplx![
+                (2.068257195514592e-01, 9.238294351481734e-01),
+                (2.068257195514592e-01, -9.238294351481734e-01),
+                (1.874933103892023e-01, 8.269455076775277e-01),
+                (1.874933103892023e-01, -8.269455076775277e-01),
+                (1.717435567330153e-01, 7.383078571194629e-01),
+                (1.717435567330153e-01, -7.383078571194629e-01),
+                (1.588266870755982e-01, 6.564623730651094e-01),
+                (1.588266870755982e-01, -6.564623730651094e-01),
+                (1.481881532502603e-01, 5.802343458081779e-01),
+                (1.481881532502603e-01, -5.802343458081779e-01),
+                (1.394122576319697e-01, 5.086609000582009e-01),
+                (1.394122576319697e-01, -5.086609000582009e-01),
+                (1.321840881809715e-01, 4.409411734716436e-01),
+                (1.321840881809715e-01, -4.409411734716436e-01),
+                (1.262633413354405e-01, 3.763990035551881e-01),
+                (1.262633413354405e-01, -3.763990035551881e-01),
+                (1.214660449478046e-01, 3.144545234797277e-01),
+                (1.214660449478046e-01, -3.144545234797277e-01),
+                (1.104868766650320e-01, 2.771505404367791e-02),
+                (1.104868766650320e-01, -2.771505404367791e-02),
+                (1.111768629525075e-01, 8.331369153155753e-02),
+                (1.111768629525075e-01, -8.331369153155753e-02),
+                (1.125740630842972e-01, 1.394219509611784e-01),
+                (1.125740630842972e-01, -1.394219509611784e-01),
+                (1.147138487992747e-01, 1.963932363793666e-01),
+                (1.147138487992747e-01, -1.963932363793666e-01),
+                (1.176516491045901e-01, 2.546021573417188e-01),
+                (1.176516491045901e-01, - 2.546021573417188e-01)
+            ],
+            k: 1.446671081817286e-06,
+        };
+
+        zpk_out.assert_approx_equal_to_with_sort(&zpk_expected, 1E-7, &[Keys::Im], &[Keys::Im]);
+    }
+
+    #[test]
+    fn test_butter_highpass_high_odd_order() {
+        let zpk_out = butter_internal(27, HighPass(0.56), None).expect("Call to butter failed");
+
+        let zpk_expected = ZPKCoeffs {
+            z: vec![Complex::<f64>::one(); 27],
+            p: vec_cplx![
+                (-1.772572785680147e-01, 9.276431102995948e-01),
+                (-1.772572785680147e-01, -9.276431102995948e-01),
+                (-1.600766565322114e-01, 8.264026279893268e-01),
+                (-1.600766565322114e-01, -8.264026279893268e-01),
+                (-1.461948419016121e-01, 7.341841939120078e-01),
+                (-1.461948419016121e-01, -7.341841939120078e-01),
+                (-1.348975284762046e-01, 6.493235066053785e-01),
+                (-1.348975284762046e-01, -6.493235066053785e-01),
+                (-1.256628210712206e-01, 5.704921366889227e-01),
+                (-1.256628210712206e-01, -5.704921366889227e-01),
+                (-1.181038235962314e-01, 4.966120551231630e-01),
+                (-1.181038235962314e-01, -4.966120551231630e-01),
+                (-1.119304913239356e-01, 4.267938916403775e-01),
+                (-1.119304913239356e-01, -4.267938916403775e-01),
+                (-1.069237739782691e-01, 3.602914879527338e-01),
+                (-1.069237739782691e-01, -3.602914879527338e-01),
+                (-1.029178030691416e-01, 2.964677964142126e-01),
+                (-1.029178030691416e-01, -2.964677964142126e-01),
+                (-9.978747500816100e-02, 2.347687643085738e-01),
+                (-9.978747500816100e-02, -2.347687643085738e-01),
+                (-9.743974496324025e-02, 1.747028739092479e-01),
+                (-9.743974496324025e-02, -1.747028739092479e-01),
+                (-9.580754551625957e-02, 1.158246860771989e-01),
+                (-9.580754551625957e-02, -1.158246860771989e-01),
+                (-9.484562207782568e-02, 5.772118357151691e-02),
+                (-9.484562207782568e-02, -5.772118357151691e-02),
+                (-9.452783117928215e-02, 0.0)
+            ],
+            k: 9.585686688851069e-09,
+        };
+
+        zpk_out.assert_approx_equal_to_with_sort(&zpk_expected, 1E-8, &[Keys::Im], &[Keys::Im]);
+    }
+
+    #[test]
+    fn test_butter_bandpass() {
+        let zpk_out = butter_internal(8, BandPass(0.25, 0.33), None).expect("Call to butter failed");
+
+        let zpk_expected = ZPKCoeffs {
+            z: vec_cplx![
+                (1.0, 0.0), (1.0, 0.0), (1.0, 0.0), (1.0, 0.0), (1.0, 0.0), (1.0, 0.0), (1.0, 0.0), (1.0, 0.0),
+                (-1.0, 0.0), (-1.0, 0.0), (-1.0, 0.0), (-1.0, 0.0), (-1.0, 0.0), (-1.0, 0.0), (-1.0, 0.0), (-1.0, 0.0)
+            ],
+            p: vec_cplx![
+                (4.979909925436156e-01, 8.367609424799387e-01),
+                (4.979909925436156e-01, -8.367609424799387e-01),
+                (4.913338722555539e-01, 7.866774509868817e-01),
+                (4.913338722555539e-01, -7.866774509868817e-01),
+                (5.035229361778706e-01, 7.401147376726750e-01),
+                (5.035229361778706e-01, -7.401147376726750e-01),
+                (5.307617160406101e-01, 7.029184459442954e-01),
+                (5.307617160406101e-01, -7.029184459442954e-01),
+                (5.680556159453138e-01, 6.788228792952775e-01),
+                (5.680556159453138e-01, -6.788228792952775e-01),
+                (6.100962560818854e-01, 6.693849403338664e-01),
+                (6.100962560818854e-01, -6.693849403338664e-01),
+                (6.904694312740631e-01, 6.930501690145245e-01),
+                (6.904694312740631e-01, -6.930501690145245e-01),
+                (6.521767004237027e-01, 6.744414640183752e-01),
+                (6.521767004237027e-01, -6.744414640183752e-01)
+            ],
+            k: 3.398854055800844e-08,
+        };
+
+        zpk_out.assert_approx_equal_to_with_sort(&zpk_expected, 1E-13, &[Keys::Im], &[Keys::Im]);
+    }
+
+    #[test]
+    fn test_butter_bandstop() {
+        let zpk_out = butter_internal(7, BandStop(0.45, 0.56), None).expect("Call to butter failed");
+
+        let zpk_expected = ZPKCoeffs {
+            z: vec_cplx![
+                (-1.594474531383421e-02, 9.998728744679880e-01),
+              (-1.594474531383421e-02, -9.998728744679880e-01),
+              (-1.594474531383421e-02, 9.998728744679880e-01),
+              (-1.594474531383421e-02, -9.998728744679880e-01),
+              (-1.594474531383421e-02, 9.998728744679880e-01),
+              (-1.594474531383421e-02, -9.998728744679880e-01),
+              (-1.594474531383421e-02, 9.998728744679880e-01),
+              (-1.594474531383421e-02, -9.998728744679880e-01),
+              (-1.594474531383421e-02, 9.998728744679880e-01),
+              (-1.594474531383421e-02, -9.998728744679880e-01),
+              (-1.594474531383421e-02, 9.998728744679880e-01),
+              (-1.594474531383421e-02, -9.998728744679880e-01),
+              (-1.594474531383421e-02, 9.998728744679880e-01),
+              (-1.594474531383421e-02, -9.998728744679880e-01)
+            ],
+            p: vec_cplx![
+                (-1.766850742887729e-01, 9.466951258673900e-01),
+                (-1.766850742887729e-01, -9.466951258673900e-01),
+                (1.467897662432886e-01, 9.515917126462422e-01),
+                (1.467897662432886e-01, -9.515917126462422e-01),
+                (-1.370083529426906e-01, 8.880376681273993e-01),
+                (-1.370083529426906e-01, -8.880376681273993e-01),
+                (1.086774544701390e-01, 8.915240810704319e-01),
+                (1.086774544701390e-01, -8.915240810704319e-01),
+                (-7.982704457700891e-02, 8.506056315273435e-01),
+                (-7.982704457700891e-02, -8.506056315273435e-01),
+                (5.238812787110331e-02, 8.524011102699969e-01),
+                (5.238812787110331e-02, -8.524011102699969e-01),
+                (-1.357545000491310e-02, 8.382287744986582e-01),
+                (-1.357545000491310e-02, -8.382287744986582e-01)
+            ],
+            k: 4.577122512960063e-01,
+        };
+
+        zpk_out.assert_approx_equal_to_with_sort(&zpk_expected, 1E-13, &[Keys::Im], &[Keys::Im]);
     }
 
     #[test]

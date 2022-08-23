@@ -8,6 +8,7 @@ pub(crate) mod test {
     use crate::filter_design::ZPKCoeffs;
     use crate::sos::Sos;
     use crate::assert_approx_eq;
+    use crate::util::{Keys, sort_lex};
     use crate::zpk2tf::BACoeffs;
 
     impl Sos {
@@ -38,6 +39,33 @@ pub(crate) mod test {
             }
 
             for (i, (p1,p2)) in self.p.iter().zip(&other.p).enumerate() {
+                assert_approx_eq!(*p1, *p2, eps, "p value at index {} not within ϵ", i);
+            }
+        }
+
+        pub fn assert_approx_equal_to_with_sort(&self, other: &ZPKCoeffs, eps: f64, z_keys: &[Keys], p_keys: &[Keys]) {
+            assert_eq!(self.z.len(), other.z.len(), "Number of zeroes are not equal.");
+            assert_eq!(self.p.len(), other.p.len(), "Number of poles are not equal.");
+
+            assert_approx_eq!(self.k, other.k, eps, "k value not within ϵ");
+
+            let z1 = &mut self.z.clone();
+            let z2 = &mut other.z.clone();
+
+            sort_lex(z1, z_keys).expect("Sorting z1 failed.");
+            sort_lex(z2, z_keys).expect("Sorting z2 failed.");
+
+            for (i, (z1,z2)) in z1.iter().zip(z2).enumerate() {
+                assert_approx_eq!(*z1, *z2, eps, "z value at index {} not within ϵ", i);
+            }
+
+            let p1 = &mut self.p.clone();
+            let p2 = &mut other.p.clone();
+
+            sort_lex(p1, p_keys).expect("Sorting p1 failed.");
+            sort_lex(p2, p_keys).expect("Sorting p2 failed.");
+
+            for (i, (p1,p2)) in p1.iter().zip(p2).enumerate() {
                 assert_approx_eq!(*p1, *p2, eps, "p value at index {} not within ϵ", i);
             }
         }

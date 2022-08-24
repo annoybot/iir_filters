@@ -25,6 +25,13 @@ pub enum FilterType {
     BandStop(f64, f64),
 }
 
+#[derive(Debug, PartialEq)]
+/// Represents the algorithm or 'category' of the filter to design, i.e: Butterworth, Chebyshev, etc...
+#[allow(missing_docs)]
+enum FilterAlgorithm {
+    Butterworth
+}
+
 /// Filter parameters in Zero, Pole, Gain format.
 pub struct ZPKCoeffs {
     ///Zeroes
@@ -65,11 +72,11 @@ pub struct ZPKCoeffs {
 ///  }
 /// ```
 pub fn butter(N: u32, filter_type: FilterType, fs: f64) -> Result<ZPKCoeffs, Error> {
-    iirfilter(N, filter_type, Some( fs ) )
+    iirfilter(N, filter_type, FilterAlgorithm::Butterworth, Some( fs ) )
 }
 
 fn butter_internal(N: u32, filter_type: FilterType, fs: Option<f64>) -> Result<ZPKCoeffs, Error> {
-    iirfilter(N, filter_type, fs )
+    iirfilter(N, filter_type, FilterAlgorithm::Butterworth, fs )
 }
 
 
@@ -85,7 +92,7 @@ fn butter_internal(N: u32, filter_type: FilterType, fs: Option<f64>) -> Result<Z
 ///
 /// The requested filter in (Zero Pole Gain)[ZPKCoeffs] format.
 ///
-fn iirfilter(N: u32, filter_type:FilterType, fs: Option<f64>) -> Result<ZPKCoeffs, Error> {
+fn iirfilter(N: u32, filter_type:FilterType, algorithm: FilterAlgorithm, fs: Option<f64>) -> Result<ZPKCoeffs, Error> {
     // Convert enum based frequency parameters to python style Wn array for internal use.
     let mut Wn:Vec<f64> = match filter_type {
         FilterType::LowPass(cutoff) | FilterType::HighPass(cutoff) => { vec![cutoff] }
@@ -123,7 +130,9 @@ fn iirfilter(N: u32, filter_type:FilterType, fs: Option<f64>) -> Result<ZPKCoeff
     let fs = 2.0;
     let warped:Vec<f64> = Wn.iter().map(|x| 2.0 * fs * f64::tan(PI * x / fs )).collect();
 
-    let zpk = butterap(N)?;
+    let zpk =  match algorithm {
+        FilterAlgorithm::Butterworth => { butterap(N)? }
+    };
 
     let zpk = match filter_type {
         FilterType::LowPass(_) => {

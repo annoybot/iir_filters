@@ -73,7 +73,8 @@ impl Sos {
         self.sections.len()
     }
 
-    fn from_vec(vec: Vec<[f64;6]>) -> Self {
+    /// Create from a vector containing an array for each section.
+    pub fn from_vec(vec: Vec<[f64; 6]>) -> Self {
         let mut sections: Vec<SosCoeffs> = vec![];
 
         for s_array in vec.iter() {
